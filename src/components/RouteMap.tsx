@@ -284,7 +284,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(({
   
   return (
     <div className="w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-gray-200 shadow-inner">
-      <div ref={mapContainerRef} className="w-full h-full">
+      <div ref={mapContainerRef} className="w-full h-full" aria-label="Route map">
         {/* Map will be rendered here */}
         {!mapInitializedRef.current && (
           <div className="w-full h-full flex items-center justify-center bg-gray-100">

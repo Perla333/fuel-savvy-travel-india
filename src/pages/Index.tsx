@@ -1,5 +1,5 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import RouteForm, { RouteFormData } from '@/components/RouteForm';
@@ -16,6 +16,16 @@ import {
   JourneyNotification, 
   JourneyPosition 
 } from '@/utils/journeySimulation';
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 const Index = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,10 +35,29 @@ const Index = () => {
   const [notifications, setNotifications] = useState<JourneyNotification[]>([]);
   const [isJourneyActive, setIsJourneyActive] = useState(false);
   const [currentPosition, setCurrentPosition] = useState<JourneyPosition | null>(null);
-  
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactNumber, setContactNumber] = useState('');
+  const [isNotificationsEnabled, setIsNotificationsEnabled] = useState(false);
+  const [contactInputError, setContactInputError] = useState('');
+
   const mapRef = useRef<any>(null);
   const simulatorRef = useRef<any>(null);
   const routeMapRef = useRef<RouteMapRef>(null);
+  const contactInputRef = useRef<HTMLInputElement>(null);
+
+  // Load notification preferences from localStorage on mount
+  useEffect(() => {
+    const savedContactNumber = localStorage.getItem('fuelSaverContactNumber');
+    const savedNotificationsEnabled = localStorage.getItem('fuelSaverNotificationsEnabled');
+    
+    if (savedContactNumber) {
+      setContactNumber(savedContactNumber);
+    }
+    
+    if (savedNotificationsEnabled === 'true') {
+      setIsNotificationsEnabled(true);
+    }
+  }, []);
 
   const handleFormSubmit = async (formData: RouteFormData) => {
     setIsLoading(true);
@@ -72,6 +101,11 @@ const Index = () => {
       });
       
       toast.success("Route calculated successfully!");
+      
+      // Check if we should show the contact modal
+      if (!isNotificationsEnabled && !localStorage.getItem('fuelSaverNotificationsSkipped')) {
+        setShowContactModal(true);
+      }
     } catch (error) {
       console.error("Error calculating route:", error);
       toast.error("Failed to calculate route. Please check your inputs and try again.");
@@ -82,10 +116,88 @@ const Index = () => {
   
   const addNotification = (notification: JourneyNotification) => {
     setNotifications(prev => [notification, ...prev.slice(0, 9)]); // Keep max 10 notifications
+    
+    // Play audio alert for certain notification types if notifications are enabled
+    if (isNotificationsEnabled && (notification.type === 'upcoming' || notification.type === 'arrived' || notification.type === 'alert')) {
+      playAlertSound(notification.type);
+    }
+  };
+  
+  const playAlertSound = (type: string) => {
+    try {
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      // Set different tones based on notification type
+      if (type === 'upcoming') {
+        oscillator.frequency.value = 440; // A4 note
+      } else if (type === 'arrived') {
+        oscillator.frequency.value = 523.25; // C5 note
+      } else if (type === 'alert') {
+        oscillator.frequency.value = 659.25; // E5 note
+      }
+      
+      gainNode.gain.value = 0.1; // Lower volume
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.start();
+      setTimeout(() => {
+        oscillator.stop();
+      }, 300);
+    } catch (error) {
+      console.error("Error playing alert sound:", error);
+    }
   };
   
   const dismissNotification = (id: string) => {
     setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+  
+  const handleContactSubmit = () => {
+    // Validate the contact number (10 digits, starts with 6-9 for Indian numbers)
+    const isValid = /^[6-9]\d{9}$/.test(contactNumber);
+    
+    if (!isValid) {
+      setContactInputError("Please enter a valid 10-digit Indian phone number");
+      return;
+    }
+    
+    // Save contact number and enable notifications
+    setIsNotificationsEnabled(true);
+    localStorage.setItem('fuelSaverContactNumber', contactNumber);
+    localStorage.setItem('fuelSaverNotificationsEnabled', 'true');
+    localStorage.removeItem('fuelSaverNotificationsSkipped');
+    
+    // Close modal
+    setShowContactModal(false);
+    
+    // Show confirmation
+    addNotification({
+      id: `notifications-enabled-${Date.now()}`,
+      type: 'initial',
+      title: 'Notifications Enabled',
+      message: `Notifications enabled for ${contactNumber}`,
+      timestamp: new Date()
+    });
+  };
+  
+  const skipContactCollection = () => {
+    // Mark notifications as skipped
+    localStorage.setItem('fuelSaverNotificationsSkipped', 'true');
+    
+    // Close modal
+    setShowContactModal(false);
+    
+    // Show skipped message
+    addNotification({
+      id: `notifications-skipped-${Date.now()}`,
+      type: 'initial',
+      title: 'Notifications Skipped',
+      message: 'Notifications skipped. You can enable them later via the chatbot.',
+      timestamp: new Date()
+    });
   };
   
   const startJourneySimulation = () => {
@@ -111,6 +223,15 @@ const Index = () => {
     // Start journey
     simulatorRef.current.start();
     setIsJourneyActive(true);
+    
+    // Notification about journey start
+    addNotification({
+      id: `journey-started-${Date.now()}`,
+      type: 'initial',
+      title: 'Journey Started',
+      message: `Starting from ${route.points[0].state} at ${new Date().toLocaleTimeString()}`,
+      timestamp: new Date()
+    });
   };
   
   const stopJourneySimulation = () => {
@@ -118,6 +239,15 @@ const Index = () => {
       simulatorRef.current.stop();
       setIsJourneyActive(false);
       setCurrentPosition(null);
+      
+      // Notification about journey stop
+      addNotification({
+        id: `journey-stopped-${Date.now()}`,
+        type: 'alert',
+        title: 'Journey Stopped',
+        message: 'You have stopped your journey',
+        timestamp: new Date()
+      });
     }
   };
 
@@ -249,6 +379,50 @@ const Index = () => {
           <p className="mt-2">Fuel prices updated as of May 2025</p>
         </div>
       </footer>
+      
+      {/* Contact Number Modal */}
+      <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Enable Journey Notifications</DialogTitle>
+            <DialogDescription>
+              Would you like to receive journey notifications? Please provide your contact number.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="contactNumber" className="text-right col-span-1">
+                Phone
+              </Label>
+              <div className="col-span-3">
+                <Input
+                  id="contactNumber"
+                  ref={contactInputRef}
+                  type="tel"
+                  placeholder="e.g., 9876543210"
+                  value={contactNumber}
+                  onChange={(e) => {
+                    setContactNumber(e.target.value);
+                    setContactInputError('');
+                  }}
+                  className={contactInputError ? "border-red-500" : ""}
+                  maxLength={10}
+                  autoComplete="tel"
+                />
+                {contactInputError && (
+                  <p className="text-red-500 text-xs mt-1">{contactInputError}</p>
+                )}
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={skipContactCollection}>
+              Skip
+            </Button>
+            <Button onClick={handleContactSubmit}>Submit</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       {/* Chatbot */}
       <Chatbot route={route} fuelType={fuelType} />

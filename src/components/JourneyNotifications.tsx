@@ -49,6 +49,8 @@ const JourneyNotifications: React.FC<JourneyNotificationsProps> = ({
           <Alert 
             key={notification.id} 
             className={`relative ${variantClass}`}
+            role="alert"
+            aria-live="polite"
           >
             <NotificationIcon className="h-4 w-4 absolute left-4 top-4" />
             <Button 
@@ -56,6 +58,7 @@ const JourneyNotifications: React.FC<JourneyNotificationsProps> = ({
               size="icon" 
               className="absolute right-2 top-2" 
               onClick={() => onDismissNotification(notification.id)}
+              aria-label="Dismiss notification"
             >
               <X className="h-4 w-4" />
             </Button>
