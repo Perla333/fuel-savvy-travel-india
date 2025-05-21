@@ -26,6 +26,8 @@ export interface Route {
 // Function to fetch route data using OSRM API
 export const getRoute = async (startLocation: string, endLocation: string, mileage: number): Promise<Route> => {
   try {
+    console.log(`Getting route from ${startLocation} to ${endLocation}`);
+    
     // First, geocode the locations to get coordinates
     const startCoords = await geocodeLocation(startLocation);
     const endCoords = await geocodeLocation(endLocation);
@@ -34,13 +36,18 @@ export const getRoute = async (startLocation: string, endLocation: string, milea
       throw new Error("Failed to geocode locations");
     }
     
+    console.log(`Start coordinates: ${startCoords.lat}, ${startCoords.lng}`);
+    console.log(`End coordinates: ${endCoords.lat}, ${endCoords.lng}`);
+    
     // Use OSRM API to get the route
     const url = `https://router.project-osrm.org/route/v1/driving/${startCoords.lng},${startCoords.lat};${endCoords.lng},${endCoords.lat}?overview=full&geometries=geojson&steps=true`;
     
+    console.log(`Fetching route from: ${url}`);
     const response = await fetch(url);
     const data = await response.json();
     
     if (!response.ok || data.code !== 'Ok') {
+      console.error('OSRM API error:', data);
       throw new Error("Failed to fetch route from OSRM API");
     }
     
@@ -48,6 +55,8 @@ export const getRoute = async (startLocation: string, endLocation: string, milea
     const coordinates = data.routes[0].geometry.coordinates;
     const totalDistance = data.routes[0].distance / 1000; // Convert to km
     const totalFuelNeeded = totalDistance / mileage;
+    
+    console.log(`Route fetched: ${coordinates.length} points, ${totalDistance.toFixed(2)} km`);
     
     // Sample points along the route to determine states
     // For demo purposes, we'll sample a point every ~50km
@@ -137,6 +146,7 @@ export const geocodeLocation = async (location: string): Promise<{lat: number, l
   try {
     const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(location)}&format=json&limit=1`;
     
+    console.log(`Geocoding location: ${location}`);
     const response = await fetch(url, {
       headers: {
         'Accept-Language': 'en-US,en;q=0.9',
@@ -153,6 +163,7 @@ export const geocodeLocation = async (location: string): Promise<{lat: number, l
       };
     }
     
+    console.error('Geocoding failed for location:', location);
     return null;
   } catch (error) {
     console.error("Error geocoding location:", error);
@@ -162,6 +173,18 @@ export const geocodeLocation = async (location: string): Promise<{lat: number, l
 
 // Convert route to GeoJSON format for display on map
 export const routeToGeoJSON = (route: Route) => {
+  if (!route || !route.points || route.points.length < 2) {
+    console.error('Invalid route data for GeoJSON conversion', route);
+    return {
+      type: "Feature",
+      properties: {},
+      geometry: {
+        type: "LineString",
+        coordinates: []
+      }
+    };
+  }
+  
   return {
     type: "Feature",
     properties: {},
