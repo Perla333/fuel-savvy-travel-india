@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Route, routeToGeoJSON } from '../utils/routing';
 import { getFuelPriceByState } from '../data/fuelPrices';
 import { PetrolBunk } from '../data/petrolBunks';
@@ -19,7 +19,17 @@ interface RouteMapProps {
   fuelType: 'petrol' | 'diesel';
 }
 
-const RouteMap: React.FC<RouteMapProps> = ({ route, refuelPoints, alerts, fuelType }) => {
+// Define the ref type for external access to component methods
+export interface RouteMapRef {
+  addDriverMarker: (position: [number, number]) => void;
+}
+
+const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(({
+  route,
+  refuelPoints,
+  alerts,
+  fuelType
+}, ref) => {
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInitializedRef = useRef<boolean>(false);
@@ -268,13 +278,9 @@ const RouteMap: React.FC<RouteMapProps> = ({ route, refuelPoints, alerts, fuelTy
   };
   
   // Expose addDriverMarker to parent component
-  React.useImperativeHandle(
-    ref,
-    () => ({
-      addDriverMarker
-    }),
-    [addDriverMarker]
-  );
+  useImperativeHandle(ref, () => ({
+    addDriverMarker
+  }), []);
   
   return (
     <div className="w-full h-full min-h-[400px] rounded-lg overflow-hidden border border-gray-200 shadow-inner">
@@ -288,6 +294,9 @@ const RouteMap: React.FC<RouteMapProps> = ({ route, refuelPoints, alerts, fuelTy
       </div>
     </div>
   );
-};
+});
+
+// Add displayName for improved debugging
+RouteMap.displayName = 'RouteMap';
 
 export default RouteMap;

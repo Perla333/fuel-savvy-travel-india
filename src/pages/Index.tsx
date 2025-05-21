@@ -3,7 +3,7 @@ import React, { useState, useRef } from 'react';
 import { Toaster } from "@/components/ui/sonner";
 import { toast } from "sonner";
 import RouteForm, { RouteFormData } from '@/components/RouteForm';
-import RouteMap from '@/components/RouteMap';
+import RouteMap, { RouteMapRef } from '@/components/RouteMap';
 import ResultsPanel from '@/components/ResultsPanel';
 import Chatbot from '@/components/Chatbot';
 import { Route, getRoute } from '@/utils/routing';
@@ -28,7 +28,7 @@ const Index = () => {
   
   const mapRef = useRef<any>(null);
   const simulatorRef = useRef<any>(null);
-  const routeMapRef = useRef<any>(null);
+  const routeMapRef = useRef<RouteMapRef>(null);
 
   const handleFormSubmit = async (formData: RouteFormData) => {
     setIsLoading(true);
